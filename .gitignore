@@ -39,7 +39,7 @@ venv.bak/
 *~
 
 # Cookies and sensitive data
-*.txt
+# *.txt
 !requirements.txt
 !www.youtube.com_cookies.txt
 
