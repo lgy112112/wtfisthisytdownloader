@@ -10,8 +10,24 @@ This is a YouTube video downloader utility built with Python that wraps yt-dlp w
 
 ### Running the Main Downloader
 ```bash
+# 交互模式（默认URL，下载到 ./downloads/）
 python download_yt.py
+
+# 指定URL
+python download_yt.py "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# 指定下载目录
+python download_yt.py -o /path/to/save "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# 非交互模式：直接指定格式代码
+python download_yt.py -f 137+bestaudio "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
+
+**CLI 参数:**
+- `url` (positional, optional): YouTube 视频 URL，默认使用硬编码 URL
+- `-o / --output`: 下载保存目录，默认为项目根目录下的 `downloads/`
+- `-f / --format`: 直接指定 yt-dlp 格式代码，跳过交互选择
+
 This launches an interactive prompt that:
 1. Lists available video formats with resolution, file size, and type
 2. Allows selection of specific quality/format
@@ -30,7 +46,7 @@ Displays raw yt-dlp format list for a hardcoded URL (useful for debugging format
 **download_yt.py** - Main interactive downloader with three key functions:
 - `get_formats(url)`: Calls yt-dlp with `--list-formats` to retrieve available formats
 - `parse_formats(output)`: Parses yt-dlp output, filters out audio-only/storyboard formats, deduplicates by resolution, and sorts by resolution
-- `download_video(url, format_code)`: Executes yt-dlp download with optional format code
+- `download_video(url, format_code, output_dir)`: Executes yt-dlp download with optional format code, saves to specified directory (defaults to `./downloads/`)
 
 **debug_formats.py** - Simple format listing tool for debugging
 
@@ -39,7 +55,7 @@ Displays raw yt-dlp format list for a hardcoded URL (useful for debugging format
 All yt-dlp calls use consistent parameters:
 - `--cookies www.youtube.com_cookies.txt` - Cookie file for authentication (must exist in working directory)
 - `--remote-components ejs:github` - Enables remote component support
-- `-o "%(title)s.%(ext)s"` - Output filename template (download_yt.py only)
+- `-o "%(title)s.%(ext)s"` - Output filename template, files saved to `downloads/` directory by default
 
 ### Format Selection Logic
 
@@ -61,6 +77,6 @@ When downloading video-only formats, the script automatically appends `+bestaudi
 
 ## Important Notes
 
-- The video URL is hardcoded in both scripts (https://youtu.be/K5zgJ_oWgAE). To download different videos, modify the `url` variable in the `__main__` block.
+- The video URL defaults to a hardcoded value but can be overridden via CLI positional argument. debug_formats.py still uses a hardcoded URL.
 - The Deno PATH addition (lines 6-7 in download_yt.py, lines 4-5 in debug_formats.py) is user-specific and may need adjustment on different systems.
 - Format parsing relies on specific regex patterns that match yt-dlp's output format. Changes to yt-dlp output formatting may break the parser.
