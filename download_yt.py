@@ -83,7 +83,7 @@ def download_video(url, format_code=None, output_dir=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="YouTube 视频下载器")
-    parser.add_argument("url", nargs="?", default="https://www.youtube.com/watch?v=a80ZFdmfpCc",
+    parser.add_argument("url", nargs="?", default="https://www.youtube.com/watch?v=opLAyaMOTyo&t=47s",
                         help="YouTube 视频 URL (默认: 硬编码 URL)")
     parser.add_argument("-o", "--output", default=None,
                         help=f"下载保存目录 (默认: {DEFAULT_DOWNLOAD_DIR})")
