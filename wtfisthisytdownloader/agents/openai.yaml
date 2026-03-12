@@ -1,0 +1,4 @@
+interface:
+  display_name: "YouTube Downloader"
+  short_description: "Download YouTube videos safely"
+  default_prompt: "Use $wtfisthisytdownloader to download this YouTube URL with the right browser profile and quality selection."

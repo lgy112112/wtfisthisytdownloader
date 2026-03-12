@@ -1,0 +1,112 @@
+# wtfisthisytdownloader
+
+Installable Codex skill for downloading YouTube videos and Shorts with browser-based authentication and interactive quality selection.
+
+## Install
+
+Use the Codex skill installer against this GitHub repo path:
+
+```bash
+python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
+  --repo lgy112112/wtfisthisytdownloader \
+  --path wtfisthisytdownloader
+```
+
+The installed skill name is `wtfisthisytdownloader`.
+
+## Product Signals And Scope
+
+- Single-purpose skill for downloading YouTube URLs.
+- Uses a bundled `yt-dlp` wrapper script instead of ad hoc shell flag assembly.
+- Authenticates from a logged-in browser profile, not from `cookies.txt`.
+- Supports interactive quality picking or forced format ids.
+- Works on macOS and Windows. `safari` is macOS-only.
+
+## Trigger Rules
+
+Use this skill when the user asks to:
+
+- download a YouTube video or Shorts URL
+- list or choose video quality before downloading
+- fetch a YouTube file that likely needs browser login state
+- retry or resume a partially downloaded YouTube file
+- download a specific `yt-dlp` format id for a YouTube URL
+
+Do not use this skill for:
+
+- non-YouTube sites
+- transcript-only tasks
+- browser automation unrelated to downloading media
+
+## Skill Contract
+
+Inputs:
+
+- a YouTube watch URL or Shorts URL
+- optional browser source: `chrome`, `edge`, `firefox`
+- optional browser source on macOS only: `safari`
+- optional output directory
+- optional explicit format id
+
+Outputs:
+
+- downloaded media file in the chosen output directory
+- or an interactive list of visible formats to choose from
+- resumable `.part` files when large downloads are interrupted
+
+## Execution Blueprint
+
+1. Confirm prerequisites.
+   Require `yt-dlp` on `PATH`.
+   Require `ffmpeg` on `PATH` for best compatibility.
+   Prefer `node` on `PATH` to improve YouTube challenge solving.
+
+2. Run the bundled script.
+
+```bash
+python3 <skill-path>/scripts/download_yt.py "<youtube-url>"
+```
+
+3. Let the script authenticate from the selected browser profile.
+   Default browser is `chrome`.
+   Override with `-b edge`, `-b firefox`, or `-b safari` on macOS.
+
+4. Choose a format.
+   Use interactive mode for manual quality selection.
+   Use `-f <id>` to skip prompts.
+
+5. Verify the output file.
+   Expect downloads under `<skill-path>/downloads/` unless `-o` overrides the directory.
+
+## Failure Path
+
+- If higher qualities are missing, retry with another logged-in browser before assuming the stream is unavailable.
+- If YouTube challenge solving fails, install `node` and rerun.
+- If a large download is interrupted, rerun the same command to resume the `.part` file.
+- If Safari cookie access fails on macOS, retry with `chrome`, `edge`, or `firefox`.
+- If `ffmpeg` is broken on macOS because of missing Homebrew libraries, repair the packages before retrying.
+
+## Guardrails
+
+- Do not ask for or store exported `cookies.txt` files.
+- Do not claim a format is unavailable until at least one logged-in browser profile has been tried.
+- Prefer the bundled script over manually composed `yt-dlp` commands so browser handling stays consistent.
+- Tell the user when the chosen format can require much more bandwidth or disk space than `18` / `360p`.
+
+## Verification Checklist
+
+- `python3 <skill-path>/scripts/download_yt.py -h` prints usage.
+- The script reports the browser source before download.
+- A real YouTube Shorts URL downloads successfully with `-f 18`.
+- A longer YouTube video lists more than one quality when the logged-in browser exposes them.
+
+## Evidence Index
+
+- Browser-auth-only flow: `wtfisthisytdownloader/scripts/download_yt.py`
+- Default browser and supported browser validation: `wtfisthisytdownloader/scripts/download_yt.py`
+- macOS and Windows setup guidance: `README.md`
+- Skill trigger and workflow contract: `wtfisthisytdownloader/SKILL.md`
+
+## Open Unknowns
+
+- Windows runtime was not exercised in this repository session, so Windows support is based on code path and setup review rather than direct execution in this environment.
