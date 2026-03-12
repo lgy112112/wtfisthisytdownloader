@@ -3,21 +3,33 @@ import sys
 import re
 import os
 import argparse
+import shutil
 
-# 添加 deno 到 PATH
-os.environ['PATH'] = os.environ.get('PATH', '') + r';C:\Users\29724\AppData\Local\Microsoft\WinGet\Packages\DenoLand.Deno_Microsoft.Winget.Source_8wekyb3d8bbwe'
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DOWNLOAD_DIR = os.path.join(ROOT_DIR, "downloads")
+DEFAULT_BROWSER = "chrome"
+COMMON_BROWSERS = ("chrome", "edge", "firefox")
+MAC_ONLY_BROWSERS = ("safari",)
 
-DEFAULT_DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
 
-def get_formats(url):
+def build_base_command(browser=None):
+    """构建 yt-dlp 基础命令。"""
+    cmd = ["yt-dlp", "--remote-components", "ejs:github"]
+
+    # 如果已安装 node，优先启用，减少 YouTube 签名解析失败。
+    if shutil.which("node"):
+        cmd.extend(["--js-runtimes", "node"])
+
+    if browser:
+        cmd.extend(["--cookies-from-browser", browser])
+
+    return cmd
+
+
+def get_formats(url, browser=None):
     """获取所有可用格式"""
-    cmd = [
-        "yt-dlp",
-        "--cookies", "www.youtube.com_cookies.txt",
-        "--remote-components", "ejs:github",
-        "--list-formats",
-        url
-    ]
+    cmd = build_base_command(browser)
+    cmd.extend(["--list-formats", url])
     result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8')
     return result.stdout + result.stderr
 
@@ -63,55 +75,87 @@ def parse_formats(output):
 
     return formats
 
-def download_video(url, format_code=None, output_dir=None):
+def download_video(url, format_code=None, output_dir=None, browser=None):
     """下载视频到指定目录"""
     if output_dir is None:
         output_dir = DEFAULT_DOWNLOAD_DIR
     os.makedirs(output_dir, exist_ok=True)
 
     output_template = os.path.join(output_dir, "%(title)s.%(ext)s")
-    cmd = [
-        "yt-dlp",
-        "--cookies", "www.youtube.com_cookies.txt",
-        "--remote-components", "ejs:github",
-        "-o", output_template,
-    ]
+    cmd = build_base_command(browser)
+    cmd.extend(["-o", output_template])
     if format_code:
         cmd.extend(["-f", format_code])
     cmd.append(url)
-    subprocess.run(cmd)
+    return subprocess.run(cmd).returncode
 
-if __name__ == "__main__":
+
+def get_browser_help():
+    browsers = ", ".join(COMMON_BROWSERS)
+    if sys.platform == "darwin":
+        return f"从浏览器读取 Cookie，默认 {DEFAULT_BROWSER}；可选 {browsers}, safari"
+    return f"从浏览器读取 Cookie，默认 {DEFAULT_BROWSER}；可选 {browsers}"
+
+
+def validate_browser(browser):
+    allowed = set(COMMON_BROWSERS)
+    if sys.platform == "darwin":
+        allowed.update(MAC_ONLY_BROWSERS)
+
+    if browser not in allowed:
+        if sys.platform == "darwin":
+            choices = ", ".join((*COMMON_BROWSERS, *MAC_ONLY_BROWSERS))
+        else:
+            choices = ", ".join(COMMON_BROWSERS)
+        raise ValueError(f"不支持的浏览器: {browser}。当前系统可用值: {choices}")
+
+
+def main():
     parser = argparse.ArgumentParser(description="YouTube 视频下载器")
-    parser.add_argument("url", nargs="?", default="https://www.youtube.com/watch?v=opLAyaMOTyo&t=47s",
-                        help="YouTube 视频 URL (默认: 硬编码 URL)")
-    parser.add_argument("-o", "--output", default=None,
-                        help=f"下载保存目录 (默认: {DEFAULT_DOWNLOAD_DIR})")
-    parser.add_argument("-f", "--format", default=None,
-                        help="直接指定 yt-dlp 格式代码，跳过交互选择")
+    parser.add_argument("url", help="YouTube 视频 URL")
+    parser.add_argument(
+        "-o",
+        "--output",
+        default=DEFAULT_DOWNLOAD_DIR,
+        help=f"下载保存目录 (默认: {DEFAULT_DOWNLOAD_DIR})",
+    )
+    parser.add_argument("-f", "--format", default=None, help="直接指定 yt-dlp 格式代码，跳过交互选择")
+    parser.add_argument(
+        "-b",
+        "--browser",
+        default=DEFAULT_BROWSER,
+        help=get_browser_help(),
+    )
     args = parser.parse_args()
 
     url = args.url
-    output_dir = args.output or DEFAULT_DOWNLOAD_DIR
+    output_dir = args.output
+    browser = args.browser
+
+    try:
+        validate_browser(browser)
+    except ValueError as exc:
+        print(exc)
+        sys.exit(2)
 
     # 非交互模式：直接使用指定格式下载
     if args.format:
         print(f"下载到: {output_dir}")
-        download_video(url, args.format, output_dir)
-        sys.exit(0)
+        print(f"Cookie 来源: 浏览器 {browser} (默认: {DEFAULT_BROWSER})")
+        sys.exit(download_video(url, args.format, output_dir, browser))
 
     print("正在获取可用格式...\n")
-    output = get_formats(url)
+    output = get_formats(url, browser)
     formats = parse_formats(output)
 
     if not formats:
         print("未找到可用格式，使用默认格式下载...")
-        download_video(url, output_dir=output_dir)
-        sys.exit(0)
+        sys.exit(download_video(url, output_dir=output_dir, browser=browser))
 
     # 显示选项
     print("="*60)
     print(f"下载到: {output_dir}")
+    print(f"Cookie 来源: 浏览器 {browser} (默认: {DEFAULT_BROWSER})")
     print("可用清晰度:")
     print("="*60)
     for i, fmt in enumerate(formats, 1):
@@ -128,7 +172,7 @@ if __name__ == "__main__":
         print("已退出")
     elif choice == "" or choice == "0":
         print("\n使用默认最佳格式下载...")
-        download_video(url, output_dir=output_dir)
+        sys.exit(download_video(url, output_dir=output_dir, browser=browser))
     else:
         try:
             idx = int(choice) - 1
@@ -136,11 +180,15 @@ if __name__ == "__main__":
                 fmt = formats[idx]
                 print(f"\n下载 {fmt['resolution']}...")
                 if fmt['type'] == '仅视频':
-                    download_video(url, f"{fmt['id']}+bestaudio", output_dir)
+                    sys.exit(download_video(url, f"{fmt['id']}+bestaudio", output_dir, browser))
                 else:
-                    download_video(url, fmt['id'], output_dir)
+                    sys.exit(download_video(url, fmt['id'], output_dir, browser))
             else:
                 print("无效选择")
         except ValueError:
             print("无效输入")
+            sys.exit(1)
 
+
+if __name__ == "__main__":
+    main()
